@@ -9,6 +9,33 @@ class ResponseMessage:
     UNFOLLOW_SUCCESS = "Unfollow user successfully"
     LIKE_SUCCESS = "Like {} successfully"
     UNLIKE_SUCCESS = "Unlike {} successfully"
+    REGISTER_SUCCESS = "Register successfully"
+    LOGIN_SUCCESS = "Login successfully"
+    LOGOUT_SUCCESS = "Logout successfully"
+    REFRESH_TOKEN_SUCCESS = "Refresh token successfully"
+    INVALID_CREDENTIALS = "Invalid credentials"
+    USER_ACCOUNT_DISABLED = "User account is disabled"
+    INVALID_REFRESH_TOKEN = "Invalid refresh token"
+    USER_NOT_FOUND = "User not found"
+    CATEGORY_NOT_FOUND = "Category not found"
+    POST_NOT_FOUND = "Post not found"
+    COMMENT_NOT_FOUND = "Comment not found"
+    SOCIAL_LINK_NOT_FOUND = "Social link not found"
+    INVALID_DATA = "Invalid data provided"
+    UNAUTHORIZED = "You are not authorized to perform this action"
+    FORBIDDEN = "You don't have permission to access this resource"
+    VALIDATION_ERROR = "Validation error"
+    MAX_DEPTH_REACHED = "Maximum comment depth reached"
+    CANNOT_FOLLOW_SELF = "You cannot follow yourself"
+    SERVER_ERROR = "Internal server error"
+    NOT_FOUND = "{} not found"
+    ALREADY_EXISTS = "{} already exists"
+
+    INVALID_DATA = "Invalid data provided"
+    UNAUTHORIZED = "You are not authorized to perform this action"
+    FORBIDDEN = "You don't have permission to access this resource"
+    VALIDATION_ERROR = "Validation error"
+    MAX_DEPTH_REACHED = "Maximum comment depth reached"
 
     # Error messages
     CREATE_ERROR = "Failed to create {}"
@@ -23,6 +50,7 @@ class ResponseMessage:
     MAX_DEPTH_REACHED = "Maximum comment depth reached"
     CANNOT_FOLLOW_SELF = "You cannot follow yourself"
     SERVER_ERROR = "Internal server error"
+    
 
 class EntityNames:
     USER = "user"

@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password
 
-
 # Người dùng
 class User(AbstractUser):
     email = models.EmailField(unique=True)
@@ -14,6 +13,12 @@ class User(AbstractUser):
     last_login = models.DateTimeField(null=True, blank=True)
     date_joined = models.DateTimeField(auto_now_add=True)
     verification_token = models.TextField(blank=True, null=True)
+    following = models.ManyToManyField(
+        'self',
+        through='UserFollower',
+        symmetrical=False,
+        related_name='followers'
+    )
 
     def __str__(self):
         return self.username
@@ -29,26 +34,23 @@ class SocialMediaLink(models.Model):
 # Danh mục bài viết
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
-
     def __str__(self):
         return self.name
 
 # Bài viết
 class Post(models.Model):
     STATUS_CHOICES = [
-        ('private', 'Private'),
-        ('public', 'Public'),
+        ('published', 'Published'),
+        ('draft', 'Draft'),
     ]
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='published')
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255)
     content = models.JSONField(default=dict)
     featured_image = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='private')
-    auto_post = models.BooleanField(default=False)
-    post_time = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -61,7 +63,6 @@ class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
     content = models.TextField()
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name="replies")
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -95,3 +96,12 @@ class PostLike(models.Model):
 
     def __str__(self):
         return f"{self.user.username} liked {self.post.title}"
+
+class UserFollower(models.Model):
+    
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='+')
+    following = models.ForeignKey(User, on_delete=models.CASCADE, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'following')

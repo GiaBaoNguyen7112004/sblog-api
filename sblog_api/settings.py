@@ -37,8 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework'
-    ,
+    'rest_framework',
     'corsheaders',
     'api',
     'rest_framework_simplejwt',
@@ -137,6 +136,10 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_RENDERER_CLASSES': [
+        'api.renderers.StandardJSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
     
     # 'DEFAULT_FILTER_BACKENDS': (
     #     'django_filters.rest_framework.DjangoFilterBackend',
@@ -151,13 +154,26 @@ REST_FRAMEWORK = {
 
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Social Blog API',
-    'DESCRIPTION': 'This is description',
+    'TITLE': 'SBlog API',
+    'DESCRIPTION': 'API documentation for SBlog',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    # OTHER SETTINGS
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
 }
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+ALLOWED_HOSTS = ['172.15.197.40', 'localhost', '127.0.0.1', '*']
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=3),  # ⏳ Access Token có thời gian sống 3 ngày
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7), # 🔄 Refresh Token có thời gian sống 7 ngày
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
