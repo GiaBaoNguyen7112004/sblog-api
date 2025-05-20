@@ -1,8 +1,10 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions 
+from rest_framework.permissions import IsAuthenticated, AllowAny  # Thêm AllowAny vào đây
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Q, Count
 from drf_yasg.utils import swagger_auto_schema
@@ -11,9 +13,10 @@ from drf_yasg import openapi
 from .renderers import StandardJSONRenderer
 from .models import SocialMediaLink, Category, Post, Comment, CommentLike, PostLike, UserFollower
 from .serializers import (
-    UserSerializer, SocialMediaLinkSerializer, CategorySerializer,
+    UserSerializer, SocialMediaLinkSerializer, CategorySerializer, CategoryDetailSerializer,
     PostSerializer, PostDetailSerializer, CommentSerializer, LoginSerializer,
-    UserDetailSerializer, UserUpdateSerializer, RegisterSerializer, LoginResponseSerializer
+    UserDetailSerializer, UserUpdateSerializer, RegisterSerializer, LoginResponseSerializer,
+    PostPaginationSerializer, ImageUploadSerializer, RefreshTokenSerializer # Add this import
 )
 from drf_spectacular.utils import OpenApiResponse, OpenApiParameter, OpenApiRequest
 from drf_spectacular.utils import OpenApiTypes, OpenApiExample
@@ -22,17 +25,17 @@ from .utils import (
     create_not_found_response, create_created_response
 )
 from .constants import ResponseMessage, EntityNames
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from django.contrib.auth.hashers import make_password
-from rest_framework import renderers
-from rest_framework.utils import json
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from .serializers import LogoutSerializer
 from drf_spectacular.utils import extend_schema
-from django.core.paginator import Paginator
-from rest_framework import serializers
-from .serializers import PostPaginationSerializer, PaginationSerializer
-
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+import cloudinary.uploader
+from .serializers import ImageUploadSerializer
+from rest_framework.permissions import AllowAny
 
 User = get_user_model()
 
@@ -138,6 +141,43 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(following, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='username',
+                description='Username của user cần tìm',
+                required=True,
+                type=OpenApiTypes.STR
+            )
+        ],
+        responses={
+            200: OpenApiResponse(response=UserDetailSerializer),
+            404: OpenApiResponse(description='User not found')
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='by-username')
+    def by_username(self, request):
+        username = request.query_params.get('username')
+        if not username:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Username parameter is required"
+            )
+            
+        try:
+            user = User.objects.get(username=username)
+            serializer = UserDetailSerializer(user, context={'request': request})
+            return Response(
+                data=serializer.data,
+                status=status.HTTP_200_OK,
+                message=ResponseMessage.GET_SUCCESS.format(EntityNames.USER)
+            )
+        except User.DoesNotExist:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND,
+                message=ResponseMessage.USER_NOT_FOUND
+            )
+
 class SocialMediaLinkViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing social media links.
@@ -218,7 +258,33 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    renderer_classes = [StandardJSONRenderer] 
+    renderer_classes = [StandardJSONRenderer]
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return CategoryDetailSerializer
+        return CategorySerializer
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(response=CategoryDetailSerializer),
+            404: OpenApiResponse(description='Category not found')
+        }
+    )
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(
+                data=serializer.data,
+                status=status.HTTP_200_OK,
+                message=ResponseMessage.GET_SUCCESS.format(EntityNames.CATEGORY)
+            )
+        except Category.DoesNotExist:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND,
+                message=ResponseMessage.CATEGORY_NOT_FOUND
+            )
 
     @extend_schema(
         request=CategorySerializer,
@@ -316,7 +382,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: PostPaginationSerializer,
+            # 200: PostPaginationSerializer,
             500: OpenApiTypes.OBJECT,
         },    
     )
@@ -428,8 +494,17 @@ class PostViewSet(viewsets.ModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        
+        # Tăng watch_count lên 1 đơn vị
+        instance.watch_count = instance.watch_count + 1
+        instance.save(update_fields=['watch_count'])
+        
         serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.POST))
+        return Response(
+            data=serializer.data, 
+            status=status.HTTP_200_OK, 
+            message=ResponseMessage.GET_SUCCESS.format(EntityNames.POST)
+        )
 
     @extend_schema(
         request=PostSerializer,
@@ -793,16 +868,24 @@ class LoginView(APIView):
         responses={200: OpenApiResponse(response=LoginResponseSerializer)}
     )    
     def post(self, request):
-        username = request.data.get('username')
+        email = request.data.get('email')
         password = request.data.get('password')
 
-        if not username:
+        if not email or not password:
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 message=ResponseMessage.INVALID_CREDENTIALS
             )
 
-        user = authenticate(username=username, password=password)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                message=ResponseMessage.INVALID_CREDENTIALS,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        user = authenticate(request, username=user.username, password=password)
         
         if user is None:
             return Response(
@@ -826,18 +909,34 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK, message=ResponseMessage.LOGIN_SUCCESS)
 
 class LogoutView(APIView):
-    renderer_classes = [StandardJSONRenderer] 
+    permission_classes = [IsAuthenticated]
+    serializer_class = LogoutSerializer
+
+    @extend_schema(
+        request=LogoutSerializer,
+        responses={200: None},
+        description="Đăng xuất và vô hiệu hóa token"
+    )
     def post(self, request):
-        try:
-            refresh_token = request.data.get('refresh_token')
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response(None, status=status.HTTP_200_OK)
-        except Exception:
-            return Response(
-                message=ResponseMessage.INVALID_REFRESH_TOKEN,
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = LogoutSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                refresh_token = serializer.validated_data['refresh_token']
+                token = RefreshToken(refresh_token)
+                token.blacklist()  # Thêm token vào blacklist
+                return Response(
+                    status=status.HTTP_200_OK,
+                    message=ResponseMessage.LOGOUT_SUCCESS
+                )
+            except Exception:
+                return Response(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    message=ResponseMessage.INVALID_REFRESH_TOKEN
+                )
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class RegisterView(APIView):
     renderer_classes = [StandardJSONRenderer] 
@@ -861,50 +960,95 @@ class RegisterView(APIView):
             'user': UserSerializer(user).data
         }, status=status.HTTP_201_CREATED, message=ResponseMessage.REGISTER_SUCCESS)
 
-# class StandardJSONRenderer(renderers.JSONRenderer):
-#     media_type = 'application/json'
-#     format = 'json'
+class ImageUploadView(APIView):
+    permission_classes = [AllowAny]
+    parser_classes = (MultiPartParser, FormParser)
+    serializer_class = ImageUploadSerializer
     
-#     def render(self, data, accepted_media_type=None, renderer_context=None):
-#         response = renderer_context.get('response')
+    @extend_schema(
+        request=ImageUploadSerializer,
+        responses={201: OpenApiResponse(description="Image uploaded successfully")}
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = ImageUploadSerializer(data=request.data)
         
-#         # Nếu response đã theo format chuẩn, không cầ n xử lý thêm
-#         if isinstance(data, dict) and all(key in data for key in ['code', 'message', 'data']):
-#             return super().render(data, accepted_media_type, renderer_context)
+        if serializer.is_valid():
+            image = serializer.validated_data['image']
+            try:
+                # Upload to cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    image,
+                    folder="sblog",  # optional folder name in cloudinary
+                    public_id=None,  # let cloudinary generate a unique id
+                    overwrite=True,
+                    resource_type="auto"
+                )
+                
+                # Return the upload result
+                data = {
+                    'url': upload_result.get('secure_url'),
+                    'public_id': upload_result.get('public_id'),
+                    'format': upload_result.get('format')
+                }
+                
+                return Response(
+                    data=data,
+                    status=status.HTTP_201_CREATED,
+                    message="Upload image successfully"
+                )
+                
+            except Exception as e:
+                return Response(
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=f"Upload failed: {str(e)}"
+                )
         
-#         # Lấy status code từ response
-#         status_code = response.status_code
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+            message="Invalid input data"
+        )
+
+class RefreshTokenView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = RefreshTokenSerializer
+
+    @extend_schema(
+        request=RefreshTokenSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Token refreshed successfully",
+                response=LoginResponseSerializer
+            ),
+            401: OpenApiResponse(description="Invalid refresh token")
+        }
+    )
+    def post(self, request):
+        serializer = RefreshTokenSerializer(data=request.data)
         
-#         # Xây dựng response format chuẩn
-#         standard_response = {
-#             'code': status_code,
-#             'message': self._get_message(status_code, data),
-#             'data': data
-#         }
-        
-#         # Trả về JSON theo format chuẩn
-#         return super().render(standard_response, accepted_media_type, renderer_context)
-    
-#     def _get_message(self, status_code, data):
-#         """
-#         Generate appropriate message based on status code and data
-#         """
-#         # Xử lý trường hợp error detail của DRF
-#         if isinstance(data, dict) and 'detail' in data:
-#             return data.pop('detail')
-            
-#         # Default messages based on status code
-#         messages = {
-#             200: 'Success',
-#             201: 'Created successfully',
-#             204: 'No content',
-#             400: 'Bad request',
-#             401: 'Unauthorized',
-#             403: 'Forbidden',
-#             404: 'Not found',
-#             405: 'Method not allowed',
-#             422: 'Validation error',
-#             500: 'Internal server error'
-#         }
-        
-#         return messages.get(status_code, 'Unknown status')
+        if serializer.is_valid():
+            try:
+                refresh_token = serializer.validated_data['refresh_token']
+                token = RefreshToken(refresh_token)
+                access_token = str(token.access_token)
+                
+                return Response(
+                    data={
+                        'access_token': access_token,
+                        'refresh_token': str(token)
+                    },
+                    status=status.HTTP_200_OK,
+                    message=ResponseMessage.REFRESH_TOKEN_SUCCESS
+                )
+                
+            except TokenError:
+                return Response(
+                    status=status.HTTP_401_UNAUTHORIZED,
+                    message=ResponseMessage.INVALID_REFRESH_TOKEN
+                )
+                
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+            message=ResponseMessage.VALIDATION_ERROR
+        )

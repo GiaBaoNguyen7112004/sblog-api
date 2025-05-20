@@ -2,22 +2,28 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from .models import SocialMediaLink, Category, Post, Comment, CommentLike, PostLike, UserFollower
 from django.contrib.auth.hashers import make_password
-User = get_user_model()
+from rest_framework.validators import UniqueValidator
 
+User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id','first_name', 'last_name', 'email', 'bio', 'avatar', 'date_joined', 'last_login', 'password')
+        fields = ('id', 'email', 'first_name', 'last_name', 'bio', 
+                 'avatar', 'date_joined', 'last_login', 'password')
         read_only_fields = ('id', 'date_joined', 'last_login')
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True, 'min_length': 8},
+            'email': {'required': True, 'validators': [UniqueValidator(queryset=User.objects.all())]}
         }
 
     def create(self, validated_data):
+        validated_data['username'] = validated_data.get('email')  # Set username to email
         validated_data['password'] = make_password(validated_data.get('password'))
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        if 'email' in validated_data:
+            validated_data['username'] = validated_data.get('email')  # Update username when email changes
         if 'password' in validated_data:
             validated_data['password'] = make_password(validated_data.get('password'))
         return super().update(instance, validated_data)
@@ -112,17 +118,17 @@ class CommentSerializer(serializers.ModelSerializer):
         return []
 
 class PostSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    author_id = serializers.IntegerField(source='user.id', read_only=True)
     likes_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
 
-
     class Meta:
         model = Post
-        fields = ('id', 'user','status', 'category', 'title', 'subtitle', 'content', 
-                 'featured_image',  'created_at', 'updated_at', 'likes_count', 'comments_count', 'is_liked')
-        read_only_fields = ('user', 'created_at', 'updated_at')
+        fields = ('id', 'author_id', 'status', 'category', 'title', 'subtitle', 
+                 'content', 'featured_image', 'created_at', 'updated_at', 
+                 'likes_count', 'comments_count', 'is_liked', 'watch_count')
+        read_only_fields = ('author_id', 'created_at', 'updated_at', 'watch_count')
 
 
     def get_likes_count(self, obj):
@@ -149,26 +155,22 @@ class PostDetailSerializer(PostSerializer):
         return CommentSerializer(comments, many=True, context=self.context).data
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, data):
-        username = data.get('username')
+        email = data.get('email')
         password = data.get('password')
 
-        if username and password:
-            user = authenticate(username=username, password=password)
-            print(user)
-            print(username)
-            print(password)
+        if email and password:
+            user = authenticate(username=email, password=password)
             if user:
                 if not user.is_active:
                     raise serializers.ValidationError("User account is disabled.")
                 data['user'] = user
                 return data
             raise serializers.ValidationError("Unable to log in with provided credentials.")
-        raise serializers.ValidationError("Must include 'email' and 'password'.") 
-    
+        raise serializers.ValidationError("Must include 'email' and 'password'.")
 
 class LoginResponseSerializer(serializers.Serializer):
     access_token = serializers.CharField()
@@ -184,3 +186,22 @@ class PaginationSerializer(serializers.Serializer):
 class PostPaginationSerializer(serializers.Serializer):
     pagination = PaginationSerializer()
     blogs = PostSerializer(many=True)
+
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField(required=True)
+
+class ImageUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField()
+
+class CategoryDetailSerializer(serializers.ModelSerializer):
+    posts_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ('id', 'name', 'posts_count')
+
+    def get_posts_count(self, obj):
+        return obj.posts.count()
+
+class RefreshTokenSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField(required=True)
