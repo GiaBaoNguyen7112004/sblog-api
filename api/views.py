@@ -279,76 +279,69 @@ class CategoryViewSet(viewsets.ModelViewSet):
             return CategoryDetailSerializer
         return CategorySerializer
 
-    @extend_schema(
-        responses={
-            200: OpenApiResponse(response=CategoryDetailSerializer),
-            404: OpenApiResponse(description='Category not found')
-        }
-    )
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return CustomResponse(
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+            message=ResponseMessage.LIST_SUCCESS.format(EntityNames.CATEGORY)
+        )
+        
     def retrieve(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
             serializer = self.get_serializer(instance)
-            return Response(
+            return CustomResponse(
                 data=serializer.data,
                 status=status.HTTP_200_OK,
                 message=ResponseMessage.GET_SUCCESS.format(EntityNames.CATEGORY)
             )
         except Category.DoesNotExist:
-            return Response(
+            return CustomResponse(
                 status=status.HTTP_404_NOT_FOUND,
                 message=ResponseMessage.CATEGORY_NOT_FOUND
             )
 
-    @extend_schema(
-        request=CategorySerializer,
-        responses={200: OpenApiResponse(response=CategorySerializer)}
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.CATEGORY))
-        
-    @extend_schema(
-        request=CategorySerializer,
-        responses={200: OpenApiResponse(response=CategorySerializer)}
-    )
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.CATEGORY))
-        
-    @extend_schema(
-        request=CategorySerializer,
-        responses={201: OpenApiResponse(response=CategorySerializer)})
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(
+                data=serializer.errors,
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                message=ResponseMessage.VALIDATION_ERROR
+            )
         self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.CATEGORY))
-        
-    @extend_schema(
-        request=CategorySerializer,
-        responses={200: OpenApiResponse(response=CategorySerializer)}
-    )
+        return CustomResponse(
+            data=serializer.data,
+            status=status.HTTP_201_CREATED,
+            message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.CATEGORY)
+        )
+
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(
+                data=serializer.errors,
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                message=ResponseMessage.VALIDATION_ERROR
+            )
         self.perform_update(serializer)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.CATEGORY))
-        
-    @extend_schema(
-        request=CategorySerializer,
-        responses={200: OpenApiResponse(response=CategorySerializer, )}
-    )
+        return CustomResponse(
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+            message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.CATEGORY)
+        )
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.CATEGORY))
+        return CustomResponse(
+            status=status.HTTP_204_NO_CONTENT,
+            message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.CATEGORY)
+        )
 
     @extend_schema(
         parameters=[
