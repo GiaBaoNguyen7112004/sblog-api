@@ -2,6 +2,15 @@ from rest_framework.response import Response
 from rest_framework import status
 from .constants import ResponseMessage, EntityNames
 
+class CustomResponse(Response):
+    def __init__(self, data=None, message=None, status=None, **kwargs):
+        response_data = {
+            'code': status or 200,
+            'message': message or 'Success',
+            'data': data
+        }
+        super().__init__(data=response_data, status=status, **kwargs)
+
 def create_response(status_code=status.HTTP_200_OK, message=None, data=None):
     """
     Create a standardized API response
@@ -80,4 +89,4 @@ def create_created_response(data=None, entity_name=None):
         status_code=status.HTTP_201_CREATED,
         message=message,
         data=data
-    ) 
+    )

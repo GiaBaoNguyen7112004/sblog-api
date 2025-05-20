@@ -22,7 +22,7 @@ from drf_spectacular.utils import OpenApiResponse, OpenApiParameter, OpenApiRequ
 from drf_spectacular.utils import OpenApiTypes, OpenApiExample
 from .utils import (
     create_response, create_success_response, create_validation_error_response,
-    create_not_found_response, create_created_response
+    create_not_found_response, create_created_response, CustomResponse
 )
 from .constants import ResponseMessage, EntityNames
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
@@ -62,10 +62,24 @@ class UserViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-    def list(self, request, *args, **kwargs):
+    def list(self, request):
         queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return CustomResponse(
+                data=serializer.data,
+                status=status.HTTP_200_OK,
+                message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER)
+            )
+
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+            message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER)
+        )
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
