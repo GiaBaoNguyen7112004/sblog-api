@@ -212,7 +212,7 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
         
     @extend_schema(
         request=SocialMediaLinkSerializer,
@@ -221,8 +221,8 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
-        
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
+
     @extend_schema(
         request=SocialMediaLinkSerializer,
         responses={201: OpenApiResponse(response=SocialMediaLinkSerializer)}
@@ -230,10 +230,10 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY, message=ResponseMessage.VALIDATION_ERROR)
         self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
-        
+        return CustomResponse(data=serializer.data, status=status.HTTP_201_CREATED, message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
+
     @extend_schema(
         request=SocialMediaLinkSerializer,
         responses={200: OpenApiResponse(response=SocialMediaLinkSerializer)}
@@ -243,10 +243,10 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY, message=ResponseMessage.VALIDATION_ERROR)
         self.perform_update(serializer)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
-    
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
+
     @extend_schema(
         request=SocialMediaLinkSerializer,
         responses={200: OpenApiResponse(response=SocialMediaLinkSerializer)}
@@ -254,7 +254,7 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
+        return CustomResponse(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.SOCIAL_MEDIA_LINK))
 
 
 # Tạo serializer cho response pagination
@@ -457,12 +457,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
                 },
                 'blogs': serializer.data
             }
-            
-            return Response(response_data, status=status.HTTP_200_OK)
-            
+
+            return CustomResponse(data=response_data, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response(
-                {'error': str(e)},
+            return CustomResponse(
+                data={'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -507,7 +507,7 @@ class PostViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=['watch_count'])
         
         serializer = self.get_serializer(instance)
-        return Response(
+        return CustomResponse(
             data=serializer.data, 
             status=status.HTTP_200_OK, 
             message=ResponseMessage.GET_SUCCESS.format(EntityNames.POST)
@@ -523,18 +523,18 @@ class PostViewSet(viewsets.ModelViewSet):
         
         # Kiểm tra category có được gửi lên không
         if 'category' not in request.data:
-            return Response(
-                {"category": ["Trường này là bắt buộc."]}, 
+            return CustomResponse(
+                data={"category": ["Trường này là bắt buộc."]}, 
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-        
+        # Kiểm tra category có tồn tại không
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         
         self.perform_create(serializer)
-        return Response(
-            serializer.data, 
-            status=status.HTTP_201_CREATED, 
+        return CustomResponse(
+            data=serializer.data,
+            status=status.HTTP_201_CREATED,
             message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.POST)
         )
 
@@ -555,11 +555,11 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         if not created:
             like.delete()
-            return Response(
+            return CustomResponse(
                 message=ResponseMessage.UNLIKE_SUCCESS.format(EntityNames.POST),
                 status=status.HTTP_200_OK
             )
-        return Response(
+        return CustomResponse(
             message=ResponseMessage.LIKE_SUCCESS.format(EntityNames.POST),
             status=status.HTTP_200_OK
         )
@@ -678,11 +678,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 'blogs': serializer.data
             }
             
-            return Response(response_data, status=status.HTTP_200_OK)
+            return CustomResponse(data=response_data, status=status.HTTP_200_OK)
             
         except Exception as e:
-            return Response(
-                {'error': str(e)},
+            return CustomResponse(
+                data={'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -738,7 +738,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return CustomResponse(data=serializer.data)
     
     @extend_schema(
         description="Tạo một comment mới"
@@ -747,9 +747,9 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            return CustomResponse(data=serializer.data, status=status.HTTP_201_CREATED)
+        return CustomResponse(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @extend_schema(
         description="Cập nhật một comment"
     )
@@ -758,17 +758,17 @@ class CommentViewSet(viewsets.ModelViewSet):
         
         # Kiểm tra quyền: chỉ tác giả mới được sửa comment
         if comment.user != request.user:
-            return Response(
-                {"detail": "Bạn không có quyền sửa comment này."},
+            return CustomResponse(
+                data={"detail": "Bạn không có quyền sửa comment này."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         serializer = self.get_serializer(comment, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            return CustomResponse(data=serializer.data)
+        return CustomResponse(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @extend_schema(
         description="Cập nhật một phần của comment"
     )
@@ -783,14 +783,14 @@ class CommentViewSet(viewsets.ModelViewSet):
         
         # Kiểm tra quyền: chỉ tác giả mới được xóa comment
         if comment.user != request.user:
-            return Response(
-                {"detail": "Bạn không có quyền xóa comment này."},
+            return CustomResponse(
+                data={"detail": "Bạn không có quyền xóa comment này."},
                 status=status.HTTP_403_FORBIDDEN
             )
             
         comment.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
+        return CustomResponse(status=status.HTTP_204_NO_CONTENT)
+
     @extend_schema(
         description="Thích hoặc bỏ thích một comment"
     )
@@ -800,23 +800,23 @@ class CommentViewSet(viewsets.ModelViewSet):
         user = request.user
         
         if not user.is_authenticated:
-            return Response(
-                {"detail": "Bạn cần đăng nhập để thực hiện hành động này."},
+            return CustomResponse(
+                data={"detail": "Bạn cần đăng nhập để thực hiện hành động này."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        
+
         # Kiểm tra xem người dùng đã thích comment này chưa
         like_exists = CommentLike.objects.filter(comment=comment, user=user).exists()
-        
+
         if like_exists:
             # Nếu đã thích, thì bỏ thích
             CommentLike.objects.filter(comment=comment, user=user).delete()
-            return Response({"detail": "Đã bỏ thích comment."})
+            return CustomResponse(data={"detail": "Đã bỏ thích comment."})
         else:
             # Nếu chưa thích, thì thích
             CommentLike.objects.create(comment=comment, user=user)
-            return Response({"detail": "Đã thích comment."})
-    
+            return CustomResponse(data={"detail": "Đã thích comment."})
+
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -839,19 +839,18 @@ class CommentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def reply(self, request):
         parent_id = request.query_params.get('parent')
-        
         if not parent_id:
-            return Response(
-                {"detail": "Bạn cần cung cấp ID của comment cần trả lời."},
+            return CustomResponse(
+                data={"detail": "Bạn cần cung cấp ID của comment cần trả lời."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Lấy comment cha
         try:
             parent_comment = Comment.objects.get(pk=parent_id)
         except Comment.DoesNotExist:
-            return Response(
-                {"detail": "Comment cha không tồn tại."},
+            return CustomResponse(
+                data={"detail": "Comment cha không tồn tại."},
                 status=status.HTTP_404_NOT_FOUND
             )
         
@@ -863,8 +862,8 @@ class CommentViewSet(viewsets.ModelViewSet):
                 parent=parent_comment,
                 post=parent_comment.post  # Reply thuộc cùng post với comment cha
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return CustomResponse(data=serializer.data, status=status.HTTP_201_CREATED)
+        return CustomResponse(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -879,16 +878,16 @@ class LoginView(APIView):
         password = request.data.get('password')
 
         if not email or not password:
-            return Response(
+            return CustomResponse(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                message=ResponseMessage.INVALID_CREDENTIALS
+                data={"message": ResponseMessage.INVALID_CREDENTIALS}
             )
 
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response(
-                message=ResponseMessage.INVALID_CREDENTIALS,
+            return CustomResponse(
+                data={"message": ResponseMessage.INVALID_CREDENTIALS},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -896,13 +895,13 @@ class LoginView(APIView):
         
         if user is None:
             return CustomResponse(
-                message=ResponseMessage.INVALID_CREDENTIALS,
+                data={"message": ResponseMessage.INVALID_CREDENTIALS},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
         if not user.is_active:
             return CustomResponse(
-                message=ResponseMessage.USER_ACCOUNT_DISABLED,
+                data={"message": ResponseMessage.USER_ACCOUNT_DISABLED},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -956,7 +955,7 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
