@@ -85,16 +85,27 @@ WSGI_APPLICATION = 'sblog_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "blog_db",
+#         "USER": "root",
+#         "PASSWORD": "giabao123123",
+#         "HOST": "127.0.0.1",
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+#         }
+#     }
+# }
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "blog_db",
-        "USER": "root",
-        "PASSWORD": "giabao123123",
-        "HOST": "127.0.0.1",
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'blog',
+        'USER': '3SGCqqWGXZXw4R3.root',
+        'PASSWORD': 'lULfjt2svJiGuvJ7',
+        'HOST': 'gateway01.eu-central-1.prod.aws.tidbcloud.com',
+        'PORT': '4000',
     }
 }
 
