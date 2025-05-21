@@ -57,4 +57,4 @@ class EntityNames:
     POST = "post"
     COMMENT = "comment"
     CATEGORY = "category"
-    SOCIAL_LINK = "social media link" 
+    SOCIAL_MEDIA_LINK = "social media link"  # Changed from SOCIAL_LINK to SOCIAL_MEDIA_LINK
