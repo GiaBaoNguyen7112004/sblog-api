@@ -84,14 +84,14 @@ class UserViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.GET_SUCCESS.format(EntityNames.USER))
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY, message=ResponseMessage.VALIDATION_ERROR)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY, message=ResponseMessage.VALIDATION_ERROR)
         self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(data=serializer.data, status=status.HTTP_201_CREATED, message=ResponseMessage.CREATE_SUCCESS.format(EntityNames.USER))
 
 
     def update(self, request, *args, **kwargs):
@@ -99,14 +99,14 @@ class UserViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return CustomResponse(data=serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY, message=ResponseMessage.VALIDATION_ERROR)
         self.perform_update(serializer)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.UPDATE_SUCCESS.format(EntityNames.USER))
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.USER))
 
     @permission_classes(permissions.IsAuthenticated)
     @extend_schema(request =None, responses=None)
@@ -114,14 +114,14 @@ class UserViewSet(viewsets.ModelViewSet):
     def follow(self, request, pk=None):
         user_to_follow = self.get_object()
         if request.user == user_to_follow:
-            return Response( status=status.HTTP_400_BAD_REQUEST, message=ResponseMessage.FOLLOW_YOURSELF)
-        
+            return CustomResponse(status=status.HTTP_400_BAD_REQUEST, message=ResponseMessage.FOLLOW_YOURSELF)
+
         _, created = UserFollower.objects.get_or_create(
             follower=request.user,
             following=user_to_follow
         )
-        
-        return Response(None, status=status.HTTP_200_OK, message=ResponseMessage.FOLLOW_SUCCESS.format(EntityNames.USER))
+
+        return CustomResponse(status=status.HTTP_200_OK, message=ResponseMessage.FOLLOW_SUCCESS.format(EntityNames.USER))
 
     @permission_classes(permissions.IsAuthenticated)
     @extend_schema(request =None, responses=None)
@@ -134,8 +134,8 @@ class UserViewSet(viewsets.ModelViewSet):
         ).delete()
         
         if deleted[0] > 0:
-            return Response(None, status=status.HTTP_200_OK, message=ResponseMessage.UNFOLLOW_SUCCESS.format(EntityNames.USER))
-        return Response(status=status.HTTP_400_BAD_REQUEST, message=ResponseMessage.UNFOLLOW_NOT_FOLLOWING.format(EntityNames.USER))
+            return CustomResponse(status=status.HTTP_200_OK, message=ResponseMessage.UNFOLLOW_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(status=status.HTTP_400_BAD_REQUEST, message=ResponseMessage.UNFOLLOW_NOT_FOLLOWING.format(EntityNames.USER))
 
 
     @extend_schema(request =None, responses={200: OpenApiResponse(response=UserSerializer(many=True))})
@@ -144,7 +144,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         followers = user.followers.all()
         serializer = UserSerializer(followers, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
 
 
     @extend_schema(request =None, responses={200: OpenApiResponse(response=UserSerializer(many=True))})
@@ -153,7 +153,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         following = user.following.all()
         serializer = UserSerializer(following, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
+        return CustomResponse(data=serializer.data, status=status.HTTP_200_OK, message=ResponseMessage.LIST_SUCCESS.format(EntityNames.USER))
 
     @extend_schema(
         parameters=[
@@ -173,7 +173,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def by_username(self, request):
         username = request.query_params.get('username')
         if not username:
-            return Response(
+            return CustomResponse(
                 status=status.HTTP_400_BAD_REQUEST,
                 message="Username parameter is required"
             )
@@ -181,13 +181,13 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = User.objects.get(username=username)
             serializer = UserDetailSerializer(user, context={'request': request})
-            return Response(
+            return CustomResponse(
                 data=serializer.data,
                 status=status.HTTP_200_OK,
                 message=ResponseMessage.GET_SUCCESS.format(EntityNames.USER)
             )
         except User.DoesNotExist:
-            return Response(
+            return CustomResponse(
                 status=status.HTTP_404_NOT_FOUND,
                 message=ResponseMessage.USER_NOT_FOUND
             )
@@ -895,13 +895,13 @@ class LoginView(APIView):
         user = authenticate(request, username=user.username, password=password)
         
         if user is None:
-            return Response(
+            return CustomResponse(
                 message=ResponseMessage.INVALID_CREDENTIALS,
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
         if not user.is_active:
-            return Response(
+            return CustomResponse(
                 message=ResponseMessage.USER_ACCOUNT_DISABLED,
                 status=status.HTTP_401_UNAUTHORIZED
             )
@@ -909,7 +909,7 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         user_serializer = UserSerializer(user)
 
-        return Response({
+        return CustomResponse(data={
             'access_token': str(refresh.access_token),
             'refresh_token': str(refresh),
             'user': user_serializer.data
@@ -931,17 +931,17 @@ class LogoutView(APIView):
                 refresh_token = serializer.validated_data['refresh_token']
                 token = RefreshToken(refresh_token)
                 token.blacklist()  # Thêm token vào blacklist
-                return Response(
+                return CustomResponse(
                     status=status.HTTP_200_OK,
                     message=ResponseMessage.LOGOUT_SUCCESS
                 )
             except Exception:
-                return Response(
+                return CustomResponse(
                     status=status.HTTP_400_BAD_REQUEST,
                     message=ResponseMessage.INVALID_REFRESH_TOKEN
                 )
-        return Response(
-            serializer.errors,
+        return CustomResponse(
+            data=serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -961,7 +961,7 @@ class RegisterView(APIView):
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         
-        return Response({
+        return CustomResponse(data={
             'access_token': str(refresh.access_token),
             'refresh_token': str(refresh),
             'user': UserSerializer(user).data
@@ -998,20 +998,20 @@ class ImageUploadView(APIView):
                     'format': upload_result.get('format')
                 }
                 
-                return Response(
+                return CustomResponse(
                     data=data,
                     status=status.HTTP_201_CREATED,
                     message="Upload image successfully"
                 )
                 
             except Exception as e:
-                return Response(
+                return CustomResponse(
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     message=f"Upload failed: {str(e)}"
                 )
         
-        return Response(
-            serializer.errors,
+        return CustomResponse(
+            data=serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
             message="Invalid input data"
         )
@@ -1039,7 +1039,7 @@ class RefreshTokenView(APIView):
                 token = RefreshToken(refresh_token)
                 access_token = str(token.access_token)
                 
-                return Response(
+                return CustomResponse(
                     data={
                         'access_token': access_token,
                         'refresh_token': str(token)
@@ -1049,13 +1049,13 @@ class RefreshTokenView(APIView):
                 )
                 
             except TokenError:
-                return Response(
+                return CustomResponse(
                     status=status.HTTP_401_UNAUTHORIZED,
                     message=ResponseMessage.INVALID_REFRESH_TOKEN
                 )
                 
-        return Response(
-            serializer.errors,
+        return CustomResponse(
+            data=serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
             message=ResponseMessage.VALIDATION_ERROR
         )
