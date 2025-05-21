@@ -106,6 +106,14 @@ DATABASES = {
         'PASSWORD': 'lULfjt2svJiGuvJ7',
         'HOST': 'gateway01.eu-central-1.prod.aws.tidbcloud.com',
         'PORT': '4000',
+        'OPTIONS': {
+            'charset': 'utf8mb4',  # Add this for proper UTF-8 support
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'ssl': {
+        # tắt verify, cực kỳ không an toàn, chỉ dev test
+                'ssl_disabled': False
+            }
+        }
     }
 }
 
