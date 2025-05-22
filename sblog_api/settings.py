@@ -202,7 +202,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-ALLOWED_HOSTS = ['172.15.197.40', 'localhost', '127.0.0.1', '*']
+ALLOWED_HOSTS = ['*']
 
 from datetime import timedelta
 
