@@ -12,7 +12,7 @@ from rest_framework.decorators import permission_classes
 from drf_yasg import openapi
 from .renderers import StandardJSONRenderer
 from .models import SocialMediaLink, Category, Post, Comment, CommentLike, PostLike, UserFollower
-from .serializers import (
+from .serializers import ( ChangePasswordSerializer,
     UserSerializer, SocialMediaLinkSerializer, CategorySerializer, CategoryDetailSerializer,
     PostSerializer, PostDetailSerializer, CommentSerializer, LoginSerializer,
     UserDetailSerializer, UserUpdateSerializer, RegisterSerializer, LoginResponseSerializer,
@@ -109,19 +109,44 @@ class UserViewSet(viewsets.ModelViewSet):
         return CustomResponse(status=status.HTTP_204_NO_CONTENT, message=ResponseMessage.DELETE_SUCCESS.format(EntityNames.USER))
 
     @permission_classes(permissions.IsAuthenticated)
-    @extend_schema(request =None, responses=None)
+    @extend_schema(request=None, responses={
+        200: OpenApiResponse(description="Follow successful"),
+        400: OpenApiResponse(description="Cannot follow yourself"),
+        404: OpenApiResponse(description="User not found")
+    })
     @action(detail=True, methods=['post'])
     def follow(self, request, pk=None):
-        user_to_follow = self.get_object()
-        if request.user == user_to_follow:
-            return CustomResponse(status=status.HTTP_400_BAD_REQUEST, message=ResponseMessage.FOLLOW_YOURSELF)
+        try:
+            user_to_follow = self.get_object()
+            
+            # Check if trying to follow self
+            if request.user.id == user_to_follow.id:
+                return CustomResponse(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    message=ResponseMessage.CANNOT_FOLLOW_SELF
+                )
 
-        _, created = UserFollower.objects.get_or_create(
-            follower=request.user,
-            following=user_to_follow
-        )
+            # Create follow relationship
+            _, created = UserFollower.objects.get_or_create(
+                follower=request.user,
+                following=user_to_follow
+            )
 
-        return CustomResponse(status=status.HTTP_200_OK, message=ResponseMessage.FOLLOW_SUCCESS.format(EntityNames.USER))
+            if created:
+                message = ResponseMessage.FOLLOW_SUCCESS
+            else:
+                message = "You are already following this user"
+
+            return CustomResponse(
+                status=status.HTTP_200_OK,
+                message=message
+            )
+            
+        except User.DoesNotExist:
+            return CustomResponse(
+                status=status.HTTP_404_NOT_FOUND,
+                message=ResponseMessage.USER_NOT_FOUND
+            )
 
     @permission_classes(permissions.IsAuthenticated)
     @extend_schema(request =None, responses=None)
@@ -1057,4 +1082,115 @@ class RefreshTokenView(APIView):
             data=serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
             message=ResponseMessage.VALIDATION_ERROR
+        )
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+
+    @extend_schema(
+        request=ChangePasswordSerializer,
+        responses={
+            200: OpenApiResponse(description="Password changed successfully"),
+            400: OpenApiResponse(description="Invalid input"),
+            401: OpenApiResponse(description="Invalid old password")
+        }
+    )
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            user = request.user
+            old_password = serializer.validated_data['old_password']
+            new_password = serializer.validated_data['new_password']
+
+            # Check if old password is correct
+            if not user.check_password(old_password):
+                return CustomResponse(
+                    status=status.HTTP_401_UNAUTHORIZED,
+                    message="Current password is incorrect"
+                )
+
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+
+            return CustomResponse(
+                status=status.HTTP_200_OK,
+                message="Password changed successfully"
+            )
+
+        return CustomResponse(
+            data=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+            message=ResponseMessage.VALIDATION_ERROR
+        )
+class SearchView(APIView):
+    permission_classes = [AllowAny]
+    
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                description='Search query for post titles or usernames',
+                required=True,
+                type=OpenApiTypes.STR
+            ),
+            OpenApiParameter(
+                name='type',
+                description='Search type: less (max 5 results each) or hard (all results)',
+                required=False,
+                type=OpenApiTypes.STR,
+                enum=['less', 'hard'],
+                default='less'
+            )
+        ],
+        responses={
+            200: OpenApiResponse(description="Search results"),
+            400: OpenApiResponse(description="Invalid parameters")
+        }
+    )
+    def get(self, request):
+        search_query = request.query_params.get('q', '')
+        search_type = request.query_params.get('type', 'less')
+
+        if not search_query:
+            return CustomResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Search query is required",
+                data={
+                    "posts": [],
+                    "users": []
+                }
+            )
+
+        # Search posts by title
+        posts = Post.objects.filter(
+            Q(title__icontains=search_query) | 
+            Q(subtitle__icontains=search_query)
+        ).order_by('-created_at')
+
+        # Search users by name or email
+        users = User.objects.filter(
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query)
+        ).order_by('-date_joined')
+
+        # Limit results if type is 'less'
+        if search_type == 'less':
+            posts = posts[:5]
+            users = users[:5]
+
+        # Serialize the results
+        post_serializer = PostSerializer(posts, many=True, context={'request': request})
+        user_serializer = UserDetailSerializer(users, many=True, context={'request': request})
+
+        return CustomResponse(
+            status=status.HTTP_200_OK,
+            message="Search results",
+            data={
+                "posts": post_serializer.data,
+                "users": user_serializer.data
+            }
         )

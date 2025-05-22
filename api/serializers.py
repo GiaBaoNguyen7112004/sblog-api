@@ -3,6 +3,11 @@ from django.contrib.auth import get_user_model, authenticate
 from .models import SocialMediaLink, Category, Post, Comment, CommentLike, PostLike, UserFollower
 from django.contrib.auth.hashers import make_password
 from rest_framework.validators import UniqueValidator
+from django.db.models import Q
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiResponse
+from rest_framework import status
 
 User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
@@ -31,8 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = SocialMediaLink
-        fields = '__all__'
-        read_only_fields = ('user',)
+        fields = ('id', 'link')  # Only expose id and link, hide user field
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,12 +50,13 @@ class UserDetailSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
     followers = UserSerializer(many=True, read_only=True)
     following = UserSerializer(many=True, read_only=True)
+    social_links = SocialMediaLinkSerializer(many=True, read_only=True)  # Add this line
 
     class Meta:
         model = User
         fields = ('id', 'first_name', 'last_name', 'email', 'bio', 'avatar',
                  'followers', 'following', 'followers_count', 'following_count',
-                 'total_likes', 'is_following')
+                 'total_likes', 'is_following', 'social_links')  # Add social_links to fields
         read_only_fields = ('id', 'email')
 
     def get_followers_count(self, obj):
@@ -205,3 +210,14 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
 
 class RefreshTokenSerializer(serializers.Serializer):
     refresh_token = serializers.CharField(required=True)
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+    confirm_password = serializers.CharField(required=True, min_length=8)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({'confirm_password': "Passwords don't match"})
+        return data
+

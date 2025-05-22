@@ -17,5 +17,7 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
     path('upload/', ImageUploadView.as_view(), name='upload-image'),
     path('auth/refresh/', views.RefreshTokenView.as_view(), name='refresh-token'),
+    path('auth/change-password/', views.ChangePasswordView.as_view(), name='change-password'),
+    path('search/', views.SearchView.as_view(), name='search'),
     path('', include(router.urls)),
 ]
