@@ -746,25 +746,54 @@ class CommentViewSet(viewsets.ModelViewSet):
     @extend_schema(
         parameters=[
             OpenApiParameter(
-                name='post',
-                description='ID của bài viết để lọc comment',
-                required=False,
+                name='post_id',
+                description='ID of the post to get comments from',
+                required=True,
                 type=OpenApiTypes.INT
-            ),
-            OpenApiParameter(
-                name='user',
-                description='ID của người dùng để lọc comment',
-                required=False,
-                type=OpenApiTypes.INT
-            ),
+            )
         ],
-        description="Lấy danh sách các comment (chỉ comment gốc, không bao gồm replies)"
+        responses={
+            200: OpenApiResponse(response=CommentSerializer(many=True)),
+            404: OpenApiResponse(description='Post not found')
+        }
     )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return CustomResponse(data=serializer.data)
-    
+    @action(detail=False, methods=['get'], url_path='by-post/(?P<post_id>[^/.]+)')
+    def by_post(self, request, post_id=None):
+        try:
+            # Check if post exists
+            post = Post.objects.get(id=post_id)
+            
+            # Get all root comments with their replies
+            queryset = Comment.objects.filter(
+                post_id=post_id,
+                parent=None
+            ).select_related('user').prefetch_related(
+                'replies',
+                'replies__user',
+                'likes'
+            ).order_by('-created_at')
+            
+            # Serialize data with all comments
+            serializer = self.get_serializer(queryset, many=True)
+            
+            return CustomResponse(
+                data=serializer.data,
+                status=status.HTTP_200_OK,
+                message=ResponseMessage.LIST_SUCCESS.format(EntityNames.COMMENT)
+            )
+            
+        except Post.DoesNotExist:
+            return CustomResponse(
+                status=status.HTTP_404_NOT_FOUND,
+                message=ResponseMessage.POST_NOT_FOUND
+            )
+        except Exception as e:
+            return CustomResponse(
+                data={'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=ResponseMessage.SERVER_ERROR
+            )
+
     @extend_schema(
         description="Tạo một comment mới"
     )
