@@ -717,7 +717,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     
     def get_queryset(self):
-        queryset = Comment.objects.filter(parent=None)  # Chỉ lấy các comment gốc
+        queryset = Comment.objects.all() # Chỉ lấy các comment gốc
         
         # Lọc theo post_id nếu được cung cấp
         post_id = self.request.query_params.get('post')
