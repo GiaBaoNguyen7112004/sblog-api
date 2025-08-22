@@ -32,18 +32,33 @@ SBlog is a simple blogging platform built with **Django** where users can **shar
 git clone https://github.com/yourusername/sblog.git
 cd sblog
 Create virtual environment
+```
 
+2. Create and activate a virtual environment
+```bash
 python -m venv venv
-source venv/bin/activate  # Linux / Mac
-venv\Scripts\activate     # Windows
+# Linux / Mac
+source venv/bin/activate
+# Windows
+venv\Scripts\activate
 Install dependencies
+```
 
+3. Install dependencies
+```bash
 pip install -r requirements.txt
 Apply migrations
+```
 
+4. Apply migrations
+```basg
 python manage.py migrate
 Run the server
+```
 
+5. Run the server:
+```basg
 python manage.py runserver
-Server will run at http://127.0.0.1:8000/
+Server will run at: http://127.0.0.1:8000/
+```
 
